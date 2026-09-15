@@ -36,3 +36,7 @@ clean: stop
 # Logs
 logs:
 	docker compose logs -f
+
+proto:
+	buf generate
+	
