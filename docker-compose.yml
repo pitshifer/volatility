@@ -1,0 +1,27 @@
+services:
+  volatility:
+    build:
+      context: .
+      dockerfile: ./docker/volatility/Dockerfile
+    networks:
+      - default
+      - kafka-net
+
+  # filebeat:
+    # image: docker.elastic.co/beats/filebeat:8.15.0
+    # network_mode: host
+    # user: root
+    # volumes:
+      # - ./docker/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+      # - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    # depends_on:
+      # - volatility
+    # command: ["--strict.perms=false"]
+
+networks:
+  # kafka живёт в отдельном проекте вне этого репозитория;
+  # сеть kafka-net должна быть поднята им заранее, здесь только подключаемся к ней
+  kafka-net:
+    external: true
+    name: kafka-net
