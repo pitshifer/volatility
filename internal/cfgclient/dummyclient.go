@@ -7,13 +7,10 @@ import (
 )
 
 type DummyClient struct {
-	Addr string
 }
 
-func NewDummyClient(addr string) *DummyClient {
-	return &DummyClient{
-		Addr: addr,
-	}
+func NewDummyClient() *DummyClient {
+	return &DummyClient{}
 }
 
 func (c *DummyClient) Instruments(ctx context.Context) ([]instruments.Instrument, error) {

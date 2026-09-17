@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -46,11 +45,7 @@ func Load() (*Config, error) {
 	}
 
 	windowSize, err := getEnv("WINDOW_SIZE", func(s string) (time.Duration, error) {
-		size, err := strconv.Atoi(s)
-		if err != nil {
-			return 0, err
-		}
-		return time.Duration(size) * time.Second, nil
+		return time.ParseDuration(s)
 	})
 	if err != nil {
 		return nil, err
