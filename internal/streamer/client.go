@@ -10,6 +10,7 @@ import (
 	"time"
 
 	apiv1 "github.com/pitshifer/volatility/internal/gen/api/v1"
+	"github.com/pitshifer/volatility/internal/model"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,12 +28,6 @@ type Client struct {
 	api  apiv1.StreamerServiceClient
 }
 
-type Quote struct {
-	Symbol    string
-	Price     float64
-	TradeTime time.Time
-}
-
 func NewClient(addr string) (*Client, error) {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -45,8 +40,8 @@ func NewClient(addr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Subscribe(ctx context.Context, symbol string) <-chan Quote {
-	quoteCh := make(chan Quote, 30)
+func (c *Client) Subscribe(ctx context.Context, symbol string) <-chan model.Quote {
+	quoteCh := make(chan model.Quote, 30)
 
 	go func() {
 		defer close(quoteCh)
@@ -66,7 +61,7 @@ func (c *Client) Subscribe(ctx context.Context, symbol string) <-chan Quote {
 					select {
 					case <-ctx.Done():
 						return
-					case quoteCh <- Quote{
+					case quoteCh <- model.Quote{
 						Symbol:    resp.Symbol,
 						Price:     resp.Price,
 						TradeTime: time.Unix(resp.TradeTime, 0),
