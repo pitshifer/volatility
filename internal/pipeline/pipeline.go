@@ -83,7 +83,7 @@ func (p *Pipeline) runWorker(ctx context.Context, instr instruments.Instrument) 
 				maxVolatility = 0
 			}
 
-			slog.Info("volatility", "symbol", instr.Symbol, "volatility", roundedVolatility)
+			slog.Info("volatility", "symbol", instr.Symbol, "volatility", roundedVolatility, "Threshold", instr.Threshold)
 		case q, ok := <-quoteCh:
 			if !ok {
 				slog.Info("worker stopped", "symbol", instr.Symbol)

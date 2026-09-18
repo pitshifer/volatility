@@ -15,6 +15,6 @@ func NewDummyClient() *DummyClient {
 
 func (c *DummyClient) Instruments(ctx context.Context) ([]instruments.Instrument, error) {
 	return []instruments.Instrument{
-		{Symbol: "btcusdt", Threshold: 0.2},
+		{Symbol: "btcusdt", Threshold: 0.02},
 	}, nil
 }

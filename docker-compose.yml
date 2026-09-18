@@ -6,6 +6,13 @@ services:
     networks:
       - default
       - kafka-net
+    environment:
+      - WINDOW_SIZE=${WINDOW_SIZE:-1m}
+      - STREAMER_ADDR=${STREAMER_ADDR:-cryptostream:50051}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka:9092}
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-volatility}
+      - KAFKA_GROUP_ID=${KAFKA_GROUP_ID:-notifier}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
 
   # filebeat:
     # image: docker.elastic.co/beats/filebeat:8.15.0
