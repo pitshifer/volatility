@@ -11,6 +11,7 @@ import (
 	"github.com/pitshifer/volatility/internal/cfgclient"
 	"github.com/pitshifer/volatility/internal/config"
 	"github.com/pitshifer/volatility/internal/instruments"
+	"github.com/pitshifer/volatility/internal/notifier"
 	"github.com/pitshifer/volatility/internal/pipeline"
 	"github.com/pitshifer/volatility/internal/streamer"
 )
@@ -29,7 +30,7 @@ func run() error {
 	// Config
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Errorf("config failed: %w", err)
+		return fmt.Errorf("config failed: %w", err)
 	}
 
 	// Streamer
@@ -48,8 +49,16 @@ func run() error {
 		return fmt.Errorf("list instrument is empty")
 	}
 
+	// Kafka producer
+	kafkaProducer := notifier.NewProducer(cfg.KafkaTopic, cfg.KafkaBrokers)
+	defer func() {
+		if err := kafkaProducer.Close(); err != nil {
+			slog.Error("closing kafka producer", "error", err)
+		}
+	}()
+
 	// Pipeline
-	pl := pipeline.New(cfg.WindowSize, instrumentManager.GetInstruments(), streamerClient)
+	pl := pipeline.New(cfg.WindowSize, instrumentManager.GetInstruments(), streamerClient, kafkaProducer)
 	pl.Run(ctx)
 
 	slog.Info("shutting down...")

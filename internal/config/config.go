@@ -9,12 +9,11 @@ import (
 )
 
 type Config struct {
-	StreamerAddr  string
-	KafkaBrokers  []string
-	KafkaTopic    string
-	KafkaTopicDLQ string
-	WindowSize    time.Duration
-	LogLevel      slog.Level
+	StreamerAddr string
+	KafkaBrokers []string
+	KafkaTopic   string
+	WindowSize   time.Duration
+	LogLevel     slog.Level
 }
 
 func Load() (*Config, error) {
@@ -39,11 +38,6 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	kafkaTopicDLQ, err := getEnv("KAFKA_TOPIC_DLQ", identity)
-	if err != nil {
-		return nil, err
-	}
-
 	windowSize, err := getEnv("WINDOW_SIZE", func(s string) (time.Duration, error) {
 		return time.ParseDuration(s)
 	})
@@ -57,12 +51,11 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		LogLevel:      logLevel,
-		KafkaBrokers:  kafkaBrokers,
-		KafkaTopic:    kafkaTopic,
-		KafkaTopicDLQ: kafkaTopicDLQ,
-		WindowSize:    windowSize,
-		StreamerAddr:  streamerAddr,
+		LogLevel:     logLevel,
+		KafkaBrokers: kafkaBrokers,
+		KafkaTopic:   kafkaTopic,
+		WindowSize:   windowSize,
+		StreamerAddr: streamerAddr,
 	}, nil
 }
 

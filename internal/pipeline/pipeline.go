@@ -16,17 +16,23 @@ type QuoteSource interface {
 	Subscribe(ctx context.Context, symbol string) <-chan model.Quote
 }
 
+type Notifier interface {
+	Notify(ctx context.Context, alert model.Alert) error
+}
+
 type Pipeline struct {
 	windowSize  time.Duration
 	instruments []instruments.Instrument
 	quoteSource QuoteSource
+	notifier    Notifier
 }
 
-func New(windowSize time.Duration, instrs []instruments.Instrument, quoteSrc QuoteSource) *Pipeline {
+func New(windowSize time.Duration, instrs []instruments.Instrument, quoteSrc QuoteSource, notifier Notifier) *Pipeline {
 	return &Pipeline{
 		windowSize:  windowSize,
 		instruments: instrs,
 		quoteSource: quoteSrc,
+		notifier:    notifier,
 	}
 }
 
@@ -49,34 +55,41 @@ func (p *Pipeline) runWorker(ctx context.Context, instr instruments.Instrument) 
 	aggr := aggregator.NewAggregator(p.windowSize)
 	ticker := time.NewTicker(time.Minute)
 
-	go func() {
-		var maxVolatility float64
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				volatility := aggr.Volatility()
-				roundedVolatility := math.Round(volatility*100) / 100
-				if volatility >= instr.Threshold {
-					if maxVolatility < volatility {
-						maxVolatility = volatility
-						// send a message to Kafka
+	var maxVolatility float64
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			volatility := aggr.Volatility()
+			roundedVolatility := math.Round(volatility*100) / 100
+			if volatility >= instr.Threshold {
+				if maxVolatility < volatility {
+					alert := model.Alert{
+						Symbol:     instr.Symbol,
+						Volatility: roundedVolatility,
+						Threshold:  instr.Threshold,
+						Timestamp:  time.Now().UTC(),
 					}
-				} else {
-					// reset max volatility
-					maxVolatility = 0
+					if err := p.notifier.Notify(ctx, alert); err != nil {
+						slog.Error("failed send alert to kafka", "error", err, "symbol", instr.Symbol)
+					} else {
+						maxVolatility = volatility
+					}
 				}
-
-				slog.Info("volatility", "symbol", instr.Symbol, "volatility", roundedVolatility)
-			case q, ok := <-quoteCh:
-				if !ok {
-					slog.Info("worker stopped", "symbol", instr.Symbol)
-					return
-				}
-				aggr.AddPrice(q.Price, q.TradeTime)
+			} else {
+				// reset max volatility
+				maxVolatility = 0
 			}
+
+			slog.Info("volatility", "symbol", instr.Symbol, "volatility", roundedVolatility)
+		case q, ok := <-quoteCh:
+			if !ok {
+				slog.Info("worker stopped", "symbol", instr.Symbol)
+				return
+			}
+			aggr.AddPrice(q.Price, q.TradeTime)
 		}
-	}()
+	}
 }
