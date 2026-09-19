@@ -16,27 +16,25 @@ type QuoteSource interface {
 	Subscribe(ctx context.Context, symbol string) <-chan model.Quote
 }
 
-type Notifier interface {
-	Notify(ctx context.Context, alert model.Alert) error
-}
-
 type Pipeline struct {
 	windowSize  time.Duration
 	instruments []instruments.Instrument
 	quoteSource QuoteSource
-	notifier    Notifier
+	alertCh     chan<- model.Alert
 }
 
-func New(windowSize time.Duration, instrs []instruments.Instrument, quoteSrc QuoteSource, notifier Notifier) *Pipeline {
+func New(windowSize time.Duration, instrs []instruments.Instrument, quoteSrc QuoteSource, alertCh chan<- model.Alert) *Pipeline {
 	return &Pipeline{
 		windowSize:  windowSize,
 		instruments: instrs,
 		quoteSource: quoteSrc,
-		notifier:    notifier,
+		alertCh:     alertCh,
 	}
 }
 
 func (p *Pipeline) Run(ctx context.Context) {
+	defer close(p.alertCh)
+
 	wg := &sync.WaitGroup{}
 	wg.Add(len(p.instruments))
 
@@ -72,10 +70,11 @@ func (p *Pipeline) runWorker(ctx context.Context, instr instruments.Instrument) 
 						Threshold:  instr.Threshold,
 						Timestamp:  time.Now().UTC(),
 					}
-					if err := p.notifier.Notify(ctx, alert); err != nil {
-						slog.Error("failed send alert to kafka", "error", err, "symbol", instr.Symbol)
-					} else {
+					select {
+					case p.alertCh <- alert:
 						maxVolatility = volatility
+					default:
+						slog.Warn("alert dropped, channel full", "symbol", instr.Symbol)
 					}
 				}
 			} else {

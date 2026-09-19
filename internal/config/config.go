@@ -9,11 +9,13 @@ import (
 )
 
 type Config struct {
-	StreamerAddr string
-	KafkaBrokers []string
-	KafkaTopic   string
-	WindowSize   time.Duration
-	LogLevel     slog.Level
+	StreamerAddr    string
+	KafkaBrokers    []string
+	KafkaTopic      string
+	WindowSize      time.Duration
+	ShutdownTimeout time.Duration
+	CheckInterval   time.Duration
+	LogLevel        slog.Level
 }
 
 func Load() (*Config, error) {
@@ -45,17 +47,32 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	shutdownTimeout, err := getEnv("SHUTDOWN_TIMEOUT", func(s string) (time.Duration, error) {
+		return time.ParseDuration(s)
+	})
+	if err != nil {
+		return nil, err
+	}
+	checkInterval, err := getEnv("CHECK_INTERVAL", func(s string) (time.Duration, error) {
+		return time.ParseDuration(s)
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	streamerAddr, err := getEnv("STREAMER_ADDR", identity)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Config{
-		LogLevel:     logLevel,
-		KafkaBrokers: kafkaBrokers,
-		KafkaTopic:   kafkaTopic,
-		WindowSize:   windowSize,
-		StreamerAddr: streamerAddr,
+		LogLevel:        logLevel,
+		KafkaBrokers:    kafkaBrokers,
+		KafkaTopic:      kafkaTopic,
+		WindowSize:      windowSize,
+		ShutdownTimeout: shutdownTimeout,
+		CheckInterval:   checkInterval,
+		StreamerAddr:    streamerAddr,
 	}, nil
 }
 

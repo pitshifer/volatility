@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/pitshifer/volatility/internal/cfgclient"
 	"github.com/pitshifer/volatility/internal/config"
 	"github.com/pitshifer/volatility/internal/instruments"
+	"github.com/pitshifer/volatility/internal/model"
 	"github.com/pitshifer/volatility/internal/notifier"
 	"github.com/pitshifer/volatility/internal/pipeline"
 	"github.com/pitshifer/volatility/internal/streamer"
@@ -45,12 +47,24 @@ func run() error {
 	if err = instrumentManager.Load(ctx); err != nil {
 		return fmt.Errorf("load instruments: %w", err)
 	}
-	if len(instrumentManager.GetInstruments()) == 0 {
+	allInstruments := instrumentManager.GetInstruments()
+	if len(allInstruments) == 0 {
 		return fmt.Errorf("list instrument is empty")
 	}
 
+	// alerting channel for notifier and pipeline
+	alertCh := make(chan model.Alert, len(allInstruments)*20)
+
 	// Kafka producer
-	kafkaProducer := notifier.NewProducer(cfg.KafkaTopic, cfg.KafkaBrokers)
+	kafkaProducer := notifier.NewProducer(cfg.KafkaTopic, cfg.KafkaBrokers, alertCh)
+	producerContext, producerCancel := context.WithCancel(context.Background())
+	defer producerCancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		kafkaProducer.Run(producerContext)
+	}()
+
 	defer func() {
 		if err := kafkaProducer.Close(); err != nil {
 			slog.Error("closing kafka producer", "error", err)
@@ -58,8 +72,14 @@ func run() error {
 	}()
 
 	// Pipeline
-	pl := pipeline.New(cfg.WindowSize, instrumentManager.GetInstruments(), streamerClient, kafkaProducer)
+	pl := pipeline.New(cfg.WindowSize, allInstruments, streamerClient, alertCh)
 	pl.Run(ctx)
+
+	select {
+	case <-done:
+	case <-time.After(cfg.ShutdownTimeout * time.Second):
+		producerCancel()
+	}
 
 	slog.Info("shutting down...")
 

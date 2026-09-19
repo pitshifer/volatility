@@ -3,6 +3,7 @@ package notifier
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/pitshifer/volatility/internal/model"
 	"github.com/segmentio/kafka-go"
@@ -16,11 +17,13 @@ type message struct {
 }
 
 type Producer struct {
-	writer *kafka.Writer
+	writer  *kafka.Writer
+	alertCh <-chan model.Alert
 }
 
-func NewProducer(topic string, brokers []string) *Producer {
+func NewProducer(topic string, brokers []string, alertCh <-chan model.Alert) *Producer {
 	return &Producer{
+		alertCh: alertCh,
 		writer: &kafka.Writer{
 			Addr:                   kafka.TCP(brokers...),
 			Topic:                  topic,
@@ -29,6 +32,14 @@ func NewProducer(topic string, brokers []string) *Producer {
 			AllowAutoTopicCreation: true,
 			Async:                  false,
 		},
+	}
+}
+
+func (p *Producer) Run(ctx context.Context) {
+	for alert := range p.alertCh {
+		if err := p.Notify(ctx, alert); err != nil {
+			slog.Error("failed to send an alert to kafka", "error", err, "symbol", alert.Symbol)
+		}
 	}
 }
 
